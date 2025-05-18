@@ -1,34 +1,91 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Server Controller</title>
+  <meta charset="UTF-8" />
+  <title>Roblox Server Controller</title>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #f0f2f5; }
+    .server { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; background: #fff; cursor: pointer; }
+    .panel { display: none; border: 1px solid #333; padding: 15px; background: #fff; margin-top: 20px; }
+    button { margin-right: 10px; }
+  </style>
 </head>
 <body>
-  <h1>Send Command</h1>
-  <input id="serverId" placeholder="Server ID"><br><br>
-  <input id="commandInput" placeholder="Command to send"><br><br>
-  <button onclick="sendCommand()">Send</button>
+  <h1>Available Roblox Servers</h1>
+  <div id="serverList">Loading servers...</div>
+
+  <div id="serverPanel" class="panel">
+    <h2 id="panelTitle">Server Details</h2>
+    <p><strong>Players:</strong> <span id="players"></span> / <span id="maxPlayers"></span></p>
+    <p><strong>Uptime:</strong> <span id="runtime"></span>s</p>
+
+    <h3>Actions</h3>
+    <button onclick="sendDefaultCommand('shutdown')">Shutdown</button>
+    <button onclick="sendDefaultCommand('kick all')">Kick All</button>
+    <button onclick="sendDefaultCommand('announce Hello!')">Announce</button>
+
+    <h3>Custom Command</h3>
+    <input id="customCmd" placeholder="Enter custom command" />
+    <button onclick="sendCustomCommand()">Send</button>
+  </div>
 
   <script>
-    const API_KEY = 'A7d9X2mPf3VzLjK8RtGwQ5BhY'; // Replace with real one
-    const BACKEND_URL = 'https://my-private-roblox-backend.onrender.com';
+    const API_KEY = "A7d9X2mPf3VzLjK8RtGwQ5BhY";
+    const BACKEND_URL = "https://my-private-roblox-backend.fly.dev";
 
-    async function sendCommand() {
-      const serverId = document.getElementById('serverId').value;
-      const command = document.getElementById('commandInput').value;
+    let currentServerId = "";
 
-      const response = await fetch(`${BACKEND_URL}/command/${serverId}`, {
-        method: 'POST',
+    async function loadServers() {
+      const res = await fetch(`${BACKEND_URL}/servers`, {
+        headers: { Authorization: API_KEY }
+      });
+      const data = await res.json();
+      const list = document.getElementById("serverList");
+      list.innerHTML = "";
+
+      for (const [id, info] of Object.entries(data)) {
+        const div = document.createElement("div");
+        div.className = "server";
+        div.innerHTML = `
+          <strong>ID:</strong> ${id}<br>
+          <strong>Players:</strong> ${info.players} / ${info.maxPlayers}<br>
+          <strong>Uptime:</strong> ${info.runtime}s
+        `;
+        div.onclick = () => showServerPanel(id, info);
+        list.appendChild(div);
+      }
+    }
+
+    function showServerPanel(id, info) {
+      currentServerId = id;
+      document.getElementById("panelTitle").innerText = `Server: ${id}`;
+      document.getElementById("players").innerText = info.players;
+      document.getElementById("maxPlayers").innerText = info.maxPlayers;
+      document.getElementById("runtime").innerText = info.runtime;
+      document.getElementById("serverPanel").style.display = "block";
+    }
+
+    async function sendDefaultCommand(command) {
+      if (!currentServerId) return alert("No server selected!");
+      await fetch(`${BACKEND_URL}/command/${currentServerId}`, {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': API_KEY
+          "Content-Type": "application/json",
+          Authorization: API_KEY
         },
         body: JSON.stringify({ command })
       });
-
-      const text = await response.text();
-      alert(text);
+      alert(`Command sent: ${command}`);
     }
+
+    async function sendCustomCommand() {
+      const command = document.getElementById("customCmd").value;
+      if (!command) return alert("Enter a command!");
+      await sendDefaultCommand(command);
+    }
+
+    loadServers();
+    setInterval(loadServers, 10000); // auto-refresh
   </script>
 </body>
 </html>
