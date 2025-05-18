@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Roblox Server Dashboard</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #121212;
+    color: #eee;
+    margin: 20px;
+  }
+  h1 {
+    text-align: center;
+    color: #4caf50;
+  }
+  #container {
+    display: flex;
+    gap: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  #server-list {
+    flex: 1;
+    background: #222;
+    padding: 15px;
+    border-radius: 8px;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  #server-list button {
+    display: block;
+    width: 100%;
+    background: #333;
+    border: none;
+    color: #eee;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    text-align: left;
+    transition: background 0.3s;
+  }
+  #server-list button:hover {
+    background: #4caf50;
+  }
+  #server-list button.active {
+    background: #4caf50;
+    font-weight: bold;
+  }
+  #command-panel {
+    flex: 1;
+    background: #222;
+    padding: 15px;
+    border-radius: 8px;
+  }
+  #command-panel textarea {
+    width: 100%;
+    height: 120px;
+    border-radius: 6px;
+    border: none;
+    padding: 10px;
+    font-size: 1rem;
+    resize: none;
+  }
+  #command-panel button {
+    margin-top: 10px;
+    width: 100%;
+    padding: 12px;
+    background: #f44336;
+    border: none;
+    color: white;
+    font-size: 1.1rem;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #command-panel button:disabled {
+    background: #888;
+    cursor: not-allowed;
+  }
+  #status {
+    margin-top: 10px;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>Roblox Servers Dashboard</h1>
+
+<div id="container">
+  <div id="server-list">
+    <h2>Servers</h2>
+    <div id="servers"></div>
+  </div>
+
+  <div id="command-panel">
+    <h2>Send Command</h2>
+    <p id="selected-server">Select a server to send commands</p>
+    <textarea id="command-input" placeholder="Enter command here..." disabled></textarea>
+    <button id="send-command" disabled>Send Command</button>
+    <p id="status"></p>
+  </div>
+</div>
+
+<script>
+  const API_URL = 'https://my-private-roblox-backend.onrender.com';
+  const API_KEY = 'A7d9X2mPf3VzLjK8RtGwQ5BhY';
+
+  const serversDiv = document.getElementById('servers');
+  const selectedServerP = document.getElementById('selected-server');
+  const commandInput = document.getElementById('command-input');
+  const sendCommandBtn = document.getElementById('send-command');
+  const statusP = document.getElementById('status');
+
+  let servers = {};
+  let selectedServerId = null;
+
+  function formatRuntime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  }
+
+  function renderServers() {
+    serversDiv.innerHTML = '';
+    Object.entries(servers).forEach(([id, data]) => {
+      const btn = document.createElement('button');
+      btn.textContent = `${id} — Players: ${data.players}/${data.maxPlayers} — Runtime: ${formatRuntime(data.runtime)}`;
+      btn.className = selectedServerId === id ? 'active' : '';
+      btn.onclick = () => {
+        selectedServerId = id;
+        selectedServerP.textContent = `Selected Server: ${id}`;
+        commandInput.disabled = false;
+        sendCommandBtn.disabled = false;
+        renderServers();
+        statusP.textContent = '';
+        commandInput.value = '';
+      };
+      serversDiv.appendChild(btn);
+    });
+  }
+
+  async function fetchServers() {
+    try {
+      const res = await fetch(API_URL + '/servers', {
+        headers: { authorization: API_KEY }
+      });
+      if (res.status === 403) throw new Error('Unauthorized');
+      const data = await res.json();
+      servers = data;
+      renderServers();
+    } catch (e) {
+      console.error(e);
+      statusP.textContent = 'Failed to load servers: ' + e.message;
+    }
+  }
+
+  async function sendCommand() {
+    if (!selectedServerId) return alert('Select a server first');
+    const cmd = commandInput.value.trim();
+    if (!cmd) return alert('Enter a command');
+    sendCommandBtn.disabled = true;
+    statusP.textContent = 'Sending command...';
+    try {
+      const res = await fetch(`${API_URL}/command/${selectedServerId}`, {
+        method: 'POST',
+        headers: {
+          'authorization': API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ command: cmd })
+      });
+      if (res.ok) {
+        statusP.textContent = 'Command queued successfully!';
+        commandInput.value = '';
+      } else {
+        statusP.textContent = 'Failed to queue command.';
+      }
+    } catch (e) {
+      statusP.textContent = 'Error sending command: ' + e.message;
+    }
+    sendCommandBtn.disabled = false;
+  }
+
+  sendCommandBtn.addEventListener('click', sendCommand);
+
+  // Poll servers every 5 seconds
+  fetchServers();
+  setInterval(fetchServers, 5000);
+</script>
+
+</body>
+</html>
