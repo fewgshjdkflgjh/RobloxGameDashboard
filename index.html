@@ -4,25 +4,82 @@
   <meta charset="UTF-8" />
   <title>Roblox Server Controller</title>
   <style>
-    body { font-family: Arial; padding: 20px; background: #f0f2f5; }
-    .server { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; background: #fff; cursor: pointer; }
-    .panel { display: none; border: 1px solid #333; padding: 15px; background: #fff; margin-top: 20px; }
-    button { margin-right: 10px; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f5f7fa;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      color: #222;
+    }
+
+    .server {
+      border: 1px solid #ccc;
+      background: #fff;
+      padding: 15px;
+      margin: 10px 0;
+      cursor: pointer;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .server:hover {
+      background: #f0f0f0;
+    }
+
+    .panel {
+      display: none;
+      background: #fff;
+      border: 1px solid #aaa;
+      padding: 20px;
+      margin-top: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    input {
+      padding: 8px;
+      width: 60%;
+      margin-right: 10px;
+    }
+
+    button {
+      padding: 8px 12px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background: #2563eb;
+    }
+
+    .default-buttons button {
+      margin-right: 8px;
+    }
   </style>
 </head>
 <body>
-  <h1>Available Roblox Servers</h1>
+  <h1>Roblox Server Dashboard</h1>
   <div id="serverList">Loading servers...</div>
 
   <div id="serverPanel" class="panel">
-    <h2 id="panelTitle">Server Details</h2>
+    <h2 id="panelTitle">Server ID</h2>
     <p><strong>Players:</strong> <span id="players"></span> / <span id="maxPlayers"></span></p>
-    <p><strong>Uptime:</strong> <span id="runtime"></span>s</p>
+    <p><strong>Uptime:</strong> <span id="runtime"></span> seconds</p>
 
-    <h3>Actions</h3>
-    <button onclick="sendDefaultCommand('shutdown')">Shutdown</button>
-    <button onclick="sendDefaultCommand('kick all')">Kick All</button>
-    <button onclick="sendDefaultCommand('announce Hello!')">Announce</button>
+    <h3>Default Commands</h3>
+    <div class="default-buttons">
+      <button onclick="sendDefaultCommand('shutdown')">Shutdown</button>
+      <button onclick="sendDefaultCommand('kick all')">Kick All</button>
+      <button onclick="sendDefaultCommand('announce Hello!')">Announce</button>
+    </div>
 
     <h3>Custom Command</h3>
     <input id="customCmd" placeholder="Enter custom command" />
@@ -36,23 +93,32 @@
     let currentServerId = "";
 
     async function loadServers() {
-      const res = await fetch(`${BACKEND_URL}/servers`, {
-        headers: { Authorization: API_KEY }
-      });
-      const data = await res.json();
-      const list = document.getElementById("serverList");
-      list.innerHTML = "";
+      try {
+        const res = await fetch(`${BACKEND_URL}/servers`, {
+          headers: { Authorization: API_KEY }
+        });
+        const data = await res.json();
+        const list = document.getElementById("serverList");
+        list.innerHTML = "";
 
-      for (const [id, info] of Object.entries(data)) {
-        const div = document.createElement("div");
-        div.className = "server";
-        div.innerHTML = `
-          <strong>ID:</strong> ${id}<br>
-          <strong>Players:</strong> ${info.players} / ${info.maxPlayers}<br>
-          <strong>Uptime:</strong> ${info.runtime}s
-        `;
-        div.onclick = () => showServerPanel(id, info);
-        list.appendChild(div);
+        for (const [id, info] of Object.entries(data)) {
+          const div = document.createElement("div");
+          div.className = "server";
+          div.innerHTML = `
+            <strong>ID:</strong> ${id}<br>
+            <strong>Players:</strong> ${info.players} / ${info.maxPlayers}<br>
+            <strong>Uptime:</strong> ${info.runtime}s
+          `;
+          div.onclick = () => showServerPanel(id, info);
+          list.appendChild(div);
+        }
+
+        if (Object.keys(data).length === 0) {
+          list.innerHTML = "No active servers found.";
+        }
+      } catch (err) {
+        console.error("Failed to load servers:", err);
+        document.getElementById("serverList").innerText = "Error loading servers.";
       }
     }
 
@@ -67,25 +133,34 @@
 
     async function sendDefaultCommand(command) {
       if (!currentServerId) return alert("No server selected!");
-      await fetch(`${BACKEND_URL}/command/${currentServerId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: API_KEY
-        },
-        body: JSON.stringify({ command })
-      });
-      alert(`Command sent: ${command}`);
+      await sendCommand(command);
     }
 
     async function sendCustomCommand() {
-      const command = document.getElementById("customCmd").value;
-      if (!command) return alert("Enter a command!");
-      await sendDefaultCommand(command);
+      const command = document.getElementById("customCmd").value.trim();
+      if (!command) return alert("Enter a custom command!");
+      await sendCommand(command);
+    }
+
+    async function sendCommand(command) {
+      try {
+        await fetch(`${BACKEND_URL}/command/${currentServerId}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: API_KEY
+          },
+          body: JSON.stringify({ command })
+        });
+        alert(`Command sent: ${command}`);
+      } catch (err) {
+        alert("Failed to send command.");
+        console.error(err);
+      }
     }
 
     loadServers();
-    setInterval(loadServers, 10000); // auto-refresh
+    setInterval(loadServers, 10000); // Refresh server list every 10 seconds
   </script>
 </body>
 </html>
